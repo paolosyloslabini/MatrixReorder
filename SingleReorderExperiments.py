@@ -16,11 +16,10 @@ from matplotlib.lines import Line2D
 
 
 n = 1000;
-m = 20;
 density = 0.2;
 
 taus = np.linspace(0,1,20)
-repetitions = 10
+repetitions = 20
 for m in [10,20,50,100]:
     for density in [0.01,0.05,0.1,0.2,0.5]:
         
@@ -31,7 +30,11 @@ for m in [10,20,50,100]:
                     tau_mult = m
             if "special" in sim_name:
                 tau_mult= 3
-            
+                
+                
+                
+            fig = plt.figure()
+            ax1 = fig.add_subplot(111)
             marker = itertools.cycle(Line2D.markers)
             for tau in taus:
                 tau *= tau_mult
@@ -44,20 +47,22 @@ for m in [10,20,50,100]:
                     do_merge = True
                     sim_measure = lambda x,y,z : csr.similarities[sim_name](x,y,z, tau);
                     grouping = graph.group_by_sim(sim_measure,do_merge)
-                    in_density, number_of_blocks = graph.blocking_show(grouping, sim_measure, filename = f"block_structures/block_structure_n{n}_m{m}_d{density}_{sim_name}_t{tau}.txt")
+                    in_density, block_rows, nz_blocks = graph.blocking(grouping, sim_measure, verbose = False)
                     densities.append(in_density)
-                    sizes.append(graph.N/number_of_blocks)
+                    sizes.append(graph.N/block_rows)
                 
                 
-                plt.scatter(densities,sizes, label = tau, marker = next(marker))
+                sc = plt.scatter(densities,sizes, c = [[tau,]]*repetitions, marker = next(marker), s = 2)
+                plt.clim(0, tau_mult)
 
-            plt.legend()
-            name = f"multiple_mat_exp/repeated_{sim_name}_n{n}_m{m}_d_{density}"
+
+            name = f"repeated_exp/{sim_name}_n{n}_m{m}_d_{density}"
+            plt.colorbar()
             plt.yscale("log")
             plt.xlim(0,1)
-            #plt.ylim()
-            plt.xlabel("tau")
-            plt.ylabel("memory")
+            plt.ylim(1,n)
+            plt.xlabel("density")
+            plt.ylabel("avg_size")
             plt.title(name)
             plt.savefig(name + ".jpg", dpi = 1000)
             plt.show()
