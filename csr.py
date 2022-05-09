@@ -103,7 +103,7 @@ class CSR:
 
         return group_array
     
-    def blocking(self,grouping, sim, verbose = True):
+    def blocking(self,grouping, sim, verbose = False):
         induced_row_order = sorted(range(len(grouping)), key=lambda k: grouping[k])
         
         current_group = 0;
@@ -117,7 +117,7 @@ class CSR:
         while new_idx < len(induced_row_order):
             old_idx = induced_row_order[new_idx]
             
-            size = 1
+            size = 0
             while new_idx < len(induced_row_order) and grouping[induced_row_order[new_idx]] == current_group:
                 
                 
@@ -127,9 +127,9 @@ class CSR:
                 new_idx +=1
                 size += 1
                 
-                old_zeros = len(np.setdiff1d(current_pattern, row, assume_unique = True))
-                
-                fake_nz += old_zeros + len(np.setdiff1d(row, current_pattern,assume_unique = True))
+                old_zeros = len(np.setdiff1d(current_pattern, row, assume_unique = True))                    
+                if size != 1:
+                        fake_nz += old_zeros + len(np.setdiff1d(row, current_pattern,assume_unique = True))
                                     
                 current_pattern = np.union1d(current_pattern,row);
             
@@ -150,7 +150,6 @@ class CSR:
             
             if (verbose):
                 print("******************BLOCKING COMPLETED")
-                print(f"BLOCK ROWS: {n_of_block_rows} of AVG. SIZE: {self.N/n_of_block_rows}")
                 print(f"TRUE NONZEROS: {self.tot_nz()} FAKE NONZEROS : {fake_nz}, with AVG. in-block DENSITY: {density}")
                 print("PRINTING BLOCK DISTRIBUTION: size -- blocks with that size")
             
@@ -177,7 +176,7 @@ class CSR:
             while new_idx < len(induced_row_order):
                 old_idx = induced_row_order[new_idx]
                 
-                size = 1
+                size = 0
                 while new_idx < len(induced_row_order) and grouping[induced_row_order[new_idx]] == current_group:
                     
                     
@@ -187,9 +186,11 @@ class CSR:
                     new_idx +=1
                     size += 1
                     
-                    old_zeros = len(np.setdiff1d(current_pattern, row, assume_unique = True))
                     
-                    fake_nz += old_zeros + len(np.setdiff1d(row, current_pattern,assume_unique = True))
+                    old_zeros = len(np.setdiff1d(current_pattern, row, assume_unique = True))                    
+                    
+                    if size != 1:
+                        fake_nz += old_zeros + len(np.setdiff1d(row, current_pattern,assume_unique = True))
                     
                     printrow = [0 for _ in range(old_zeros)] + [1 for _ in range(len(row))]
                     
@@ -254,7 +255,7 @@ def merge_patterns(p1,p2):
     return np.union1d(p1, p2)
 
 
-def weighted_sim(size1,p1,p2, tau = 0.7, use_size = False, relative_val = True, cosine = False):
+def weighted_sim(size1,p1,p2, tau, use_size = False, relative_val = True, cosine = False):
     if (len(p1) == 0) and (len(p2) == 0):
         return True
 
@@ -296,7 +297,7 @@ def weighted_sim(size1,p1,p2, tau = 0.7, use_size = False, relative_val = True, 
         unsim = unsim*1./tot
     if cosine:
         unsim = unsim*1./(len(p1)*len(p2))
-    return (unsim < tau)
+    return (unsim <= tau)
 
     
 

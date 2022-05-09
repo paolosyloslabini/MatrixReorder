@@ -52,7 +52,7 @@ for m in [10,20,50,100]:
                     sizes.append(graph.N/block_rows)
                 
                 
-                sc = plt.scatter(densities,sizes, c = [[tau,]]*repetitions, marker = next(marker), s = 2)
+                sc = plt.scatter(densities,sizes, c = [tau]*20, marker = next(marker), s = 2)
                 plt.clim(0, tau_mult)
 
 
