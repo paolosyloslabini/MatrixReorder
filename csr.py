@@ -109,9 +109,11 @@ class CSR:
         if len(row) == 0 or len(pattern) == 0:
             return False
         prob = prob_of_better(self.M, pattern, row , self.density())
-        merge =  int(prob*candidates) < target_size*safety_mult
+        prob2 = 1 - prob_of_better(self.M, row, pattern, self.density())
+        best_for_pattern =  int(prob*candidates) < target_size*safety_mult
+        best_for_row = int(prob2*candidates) < target_size*safety_mult
         #print(pattern, row, candidates, prob, merge)
-        return merge    
+        return best_for_pattern or best_for_row 
     
     def fixed_size_blocking(self, block_size):
         group_name = -1;
