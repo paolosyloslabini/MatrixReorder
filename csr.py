@@ -11,15 +11,12 @@ import os
 import numpy as np
 import matplotlib.pyplot as plt
 import itertools
+from scipy.stats import binom
 
-try:
-    os.mkdir("similarity_curves")
-except:
-    0    
-try:
-    os.mkdir("block_structures")
-except:
-    0
+
+def prob_of_better(n, row1, row2, density):
+    diff = len(np.setdiff1d(row2, row1))
+    return binom.cdf(diff - 1,n - len(row1), density)
 
 class CSR: 
     def __init__(self):
@@ -104,6 +101,43 @@ class CSR:
                             if do_merge:
                                 pattern = merge_patterns(pattern, other_pattern)
 
+        return group_array
+
+    def merge_prob(self, candidates, pattern, target_size, row, safety_mult = 2):
+        if len(pattern) == 0 and len(row) == 0:
+            return True
+        if len(row) == 0 or len(pattern) == 0:
+            return False
+        prob = prob_of_better(self.M, pattern, row , self.density())
+        merge =  int(prob*candidates) < target_size*safety_mult
+        #print(pattern, row, candidates, prob, merge)
+        return merge    
+    
+    def fixed_size_blocking(self, block_size):
+        group_name = -1;
+        group_array = np.ones(self.N)*(-1)
+        
+        for row_idx in range(self.N):
+            if group_array[row_idx] == -1:
+                group_name += 1;
+                group_size = 1
+                group_array[row_idx] = group_name
+                pattern = self.pos[row_idx]
+                size_reached = False
+                for other_row_idx in range(row_idx+1,self.N):
+                    if size_reached:
+                        break
+                    if group_array[other_row_idx] == -1:
+                        other_pattern =  self.pos[other_row_idx]
+                        candidates = len([x for x in group_array[other_row_idx + 1:] if x == -1])
+                        merge = self.merge_prob(candidates, pattern, block_size - group_size, other_pattern)
+                        if merge:
+                            group_size += 1;
+                            candidates = -1;
+                            group_array[other_row_idx] = group_name;
+                            pattern = merge_patterns(pattern, other_pattern)
+                            if group_size == block_size:
+                                size_reached = True
         return group_array
     
     def blocking(self,grouping, sim = None, verbose = False):
