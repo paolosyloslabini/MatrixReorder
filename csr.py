@@ -44,6 +44,9 @@ class CSR:
             tot += count
         return tot
     
+    def density(self):
+        return self.tot_nz()*1./(self.N*self.M)
+    
     def fill_from_edgelist(self,edgelist_file, delimiter = " "):
         #must be a sorted edgelist (gaps allowed)
         self.clean()
@@ -103,7 +106,7 @@ class CSR:
 
         return group_array
     
-    def blocking(self,grouping, sim, verbose = False):
+    def blocking(self,grouping, sim = None, verbose = False):
         induced_row_order = sorted(range(len(grouping)), key=lambda k: grouping[k])
         
         current_group = 0;
@@ -148,19 +151,19 @@ class CSR:
             
             density = self.tot_nz()/(self.tot_nz() + fake_nz)
             
-            if (verbose):
-                print("******************BLOCKING COMPLETED")
-                print(f"TRUE NONZEROS: {self.tot_nz()} FAKE NONZEROS : {fake_nz}, with AVG. in-block DENSITY: {density}")
-                print("PRINTING BLOCK DISTRIBUTION: size -- blocks with that size")
-            
-                for num in sorted(blocks_distribution):
-                    print(f"{num} --> {blocks_distribution[num]}")
+        if (verbose):
+            print("******************BLOCKING COMPLETED")
+            print(f"TRUE NONZEROS: {self.tot_nz()} FAKE NONZEROS : {fake_nz}, with AVG. in-block DENSITY: {density}")
+            print("PRINTING BLOCK DISTRIBUTION: size -- blocks with that size")
+        
+            for num in sorted(blocks_distribution):
+                print(f"{num} --> {blocks_distribution[num]}")
             
         return density, n_of_block_rows, nz_blocks
 
     
     
-    def blocking_show(self,grouping, sim, filename = "blocking_structure_example.txt"):
+    def blocking_show(self,grouping, sim = None, filename = "blocking_structure_example.txt"):
         induced_row_order = sorted(range(len(grouping)), key=lambda k: grouping[k])
         
         current_group = 0;
