@@ -51,8 +51,8 @@ for m in [10,20,50,100]:
         
         densities = []
         avg_sizes = []
-        for tau in np.linspace(0,1,20):
-            grouping = graph.fixed_size_blocking(tau*graph.N)
+        for tau in np.linspace(1,graph.M, 10):
+            grouping = graph.fixed_size_blocking(tau)
             in_density, block_rows, nz_blocks = graph.blocking_show(grouping, sim_measure, filename = f"block_structures/block_structure_n{n}_m{m}_d{density}_{sim_name}_t{tau}.txt")
             densities.append(in_density)
             avg_sizes.append(graph.N/block_rows)
