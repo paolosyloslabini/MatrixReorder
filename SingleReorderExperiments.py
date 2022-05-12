@@ -47,9 +47,9 @@ for m in [10,20,50,100]:
                     do_merge = True
                     sim_measure = lambda x,y,z : csr.similarities[sim_name](x,y,z, tau);
                     grouping = graph.group_by_sim(sim_measure,do_merge)
-                    in_density, block_rows, nz_blocks = graph.blocking(grouping, sim_measure, verbose = False)
+                    in_density, total_block_height, nz_blocks = graph.blocking(grouping, sim_measure, verbose = False)
                     densities.append(in_density)
-                    sizes.append(graph.N/block_rows)
+                    sizes.append(total_block_height.N/nz_blocks)
                 
                 
                 sc = plt.scatter(densities,sizes, c = [tau]*20, marker = next(marker), s = 2)

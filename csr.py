@@ -102,20 +102,8 @@ class CSR:
                                 pattern = merge_patterns(pattern, other_pattern)
 
         return group_array
-
-    def merge_prob(self, candidates, pattern, target_size, row, safety_mult = 2):
-        if len(pattern) == 0 and len(row) == 0:
-            return True
-        if len(row) == 0 or len(pattern) == 0:
-            return False
-        prob = prob_of_better(self.M, pattern, row , self.density())
-        prob2 = 1 - prob_of_better(self.M, row, pattern, self.density())
-        best_for_pattern =  int(prob*candidates) < target_size*safety_mult
-        best_for_row = int(prob2*candidates) < target_size*safety_mult
-        #print(pattern, row, candidates, prob, merge)
-        return best_for_pattern or best_for_row 
     
-    def fixed_size_blocking(self, block_size):
+    def fixed_size_blocking(self, block_size, merge_crit):
         group_name = -1;
         group_array = np.ones(self.N)*(-1)
         
@@ -132,7 +120,7 @@ class CSR:
                     if group_array[other_row_idx] == -1:
                         other_pattern =  self.pos[other_row_idx]
                         candidates = len([x for x in group_array[other_row_idx + 1:] if x == -1])
-                        merge = self.merge_prob(candidates, pattern, block_size - group_size, other_pattern)
+                        merge = merge_crit(self.M, self.density, candidates, pattern, block_size - group_size, other_pattern)
                         if merge:
                             group_size += 1;
                             candidates = -1;
@@ -209,12 +197,14 @@ class CSR:
         with open(filename, "w") as outfile:
             new_idx = 0
             n_of_block_rows = 0
+            total_block_height = 0
             nz_blocks = 0
             fake_nz = 0
             blocks_distribution = {}
             while new_idx < len(induced_row_order):
                 old_idx = induced_row_order[new_idx]
                 
+                fake_nz_here = 0
                 size = 0
                 while new_idx < len(induced_row_order) and grouping[induced_row_order[new_idx]] == current_group:
                     
@@ -229,7 +219,7 @@ class CSR:
                     old_zeros = len(np.setdiff1d(current_pattern, row, assume_unique = True))                    
                     
                     if size != 1:
-                        fake_nz += old_zeros + len(np.setdiff1d(row, current_pattern,assume_unique = True))
+                        fake_nz_here += old_zeros + len(np.setdiff1d(row, current_pattern,assume_unique = True))
                     
                     printrow = [0 for _ in range(old_zeros)] + [1 for _ in range(len(row))]
                     
@@ -238,7 +228,9 @@ class CSR:
                     current_pattern = np.union1d(current_pattern,row);
                 
                 if len(current_pattern) != 0:
+                    fake_nz += fake_nz_here
                     n_of_block_rows += 1
+                    total_block_height += size*len(current_pattern)
                     nz_blocks += len(current_pattern)
                     if size not in blocks_distribution:
                         blocks_distribution[size] = 1
@@ -253,7 +245,7 @@ class CSR:
             
             density = self.tot_nz()/(self.tot_nz() + fake_nz)
             print("******************BLOCKING COMPLETED", file = outfile)
-            print(f"BLOCK ROWS: {n_of_block_rows} of AVG. SIZE: {self.N/n_of_block_rows}", file = outfile)
+            print(f"BLOCK ROWS: {n_of_block_rows} of AVG. SIZE: {total_block_height/nz_blocks}", file = outfile)
             print(f"TRUE NONZEROS: {self.tot_nz()} FAKE NONZEROS : {fake_nz}, with AVG. in-block DENSITY: {density}", file = outfile)
             print("PRINTING BLOCK DISTRIBUTION: size -- blocks with that size", file = outfile)
             
@@ -261,7 +253,7 @@ class CSR:
                 print(f"{num} --> {blocks_distribution[num]}", file = outfile)
             
             
-        return density, n_of_block_rows, nz_blocks
+        return density, total_block_height, nz_blocks
     
     def print_blocking(self, grouping):
         induced_row_order = sorted(range(len(grouping)), key=lambda k: grouping[k])
@@ -338,7 +330,27 @@ def weighted_sim(size1,p1,p2, tau, use_size = False, relative_val = True, cosine
         unsim = unsim*1./(len(p1)*len(p2))
     return (unsim <= tau)
 
-    
+def merge_prob(M, density,  candidates, pattern, target_size, row, safety_mult = 2):
+    if len(pattern) == 0 and len(row) == 0:
+        return True
+    if len(row) == 0 or len(pattern) == 0:
+        return False
+    prob = prob_of_better(M, pattern, row , density())
+    best_for_pattern =  int(prob*candidates) < target_size*safety_mult
+    #print(pattern, row, candidates, prob, merge)
+    return best_for_pattern 
+
+def double_merge_prob(M, density, candidates, pattern, target_size, row, safety_mult = 2):
+    if len(pattern) == 0 and len(row) == 0:
+        return True
+    if len(row) == 0 or len(pattern) == 0:
+        return False
+    prob = prob_of_better(M, pattern, row , density())
+    prob2 = prob_of_better(M, row, pattern, density())
+    final_prob = min(prob,prob2)
+    return  int(final_prob*candidates) < target_size*2
+
+
 
 def make_random_CSR(n,m, density):
     graph = CSR();
@@ -394,3 +406,8 @@ similarities = {
     "cosine" : cosine,
     "cosine_special": cosine_special
     }
+
+fixed_size_criteria = {
+        "fixsize_single_prob" : merge_prob,
+        "fixsize_double_prob" : double_merge_prob
+        }
