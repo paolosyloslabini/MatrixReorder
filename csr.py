@@ -94,7 +94,7 @@ class CSR:
                     #print("comparing", row_idx, other_row_idx)
                     if group_array[other_row_idx] == -1:
                         other_pattern =  self.pos[other_row_idx]
-                        merge = sim_func(group_size, pattern, other_pattern)
+                        merge = sim_func(pattern, group_size, other_pattern, 1)
                         if merge:
                             group_size += 1;
                             group_array[other_row_idx] = group_name;
@@ -103,6 +103,273 @@ class CSR:
 
         return group_array
     
+    
+    
+    def hierchical_blocking_link(self, target_block_size, similarity, current_block_size = 1, grouping = None):
+        
+        if current_block_size == 1:
+            grouping = range(self.N)
+        
+        new_group = np.ones(self.N)*(-1)
+        pointers = np.ones(self.N//current_block_size)*(-1)
+        
+        induced_row_order = sorted(range(len(grouping)), key=lambda k: grouping[k])
+        
+        #print(f"fixed size blocking, current size {current_block_size}, target {target_block_size}") 
+        #print(f"CURRENT GROUPING: {grouping}")
+    
+        def is_assigned(group_idx):
+            true_idx = group_idx*current_block_size
+            old_idx = induced_row_order[true_idx]
+            #print(f"checking {i}, old idx {old_idx}")
+            return new_group[old_idx] != -1
+        
+        def assign_group(group_idx, group_name):
+            true_idx = group_idx*current_block_size
+            #print(f"assigning {i} to {group_name}")
+            for idx in range(true_idx, true_idx + current_block_size):
+                old_idx = induced_row_order[idx]
+                new_group[old_idx] = group_name
+                #print(f"***** {idx}, old_idx {old_idx}")
+                
+        def get_pattern(group_idx):
+            
+            true_idx = group_idx*current_block_size
+            pattern = self.pos[induced_row_order[true_idx]]
+            for idx in range(true_idx, true_idx+current_block_size):
+                row = self.pos[induced_row_order[true_idx]]
+                pattern = np.union1d(pattern,row);
+            return pattern
+
+        def find_unassigned():
+            i = 0;
+            while i < self.N//current_block_size and is_assigned(i):
+                i += 1;
+            if i == self.N//current_block_size: 
+                return -1
+            else:
+                return i
+            
+        def find_min_idx(group_idx):
+            min_idx = int(pointers[group_idx])
+            if pointers[group_idx] == -1 or is_assigned(min_idx):
+                min_sim = float('inf')
+                min_idx = -1
+                #print("recalculating min for {group_idx}")
+                for j in range(self.N//current_block_size):
+                    
+                    if not is_assigned(j) and j != group_idx:
+                        other_pattern = get_pattern(j)
+                        tmp_sim = similarity(pattern, other_pattern)
+                        if tmp_sim < min_sim:
+                            min_sim = tmp_sim
+                            min_idx = j
+            return min_idx
+            
+            
+
+
+        i = 0;
+        last_visited = -1
+        current_group_name = 0
+        not_done = True
+        
+        while (not_done):
+            
+            pattern = get_pattern(i)
+        
+        
+            #find nearest neighbour. recaculate if necessary
+            min_idx = find_min_idx(i)
+            pointers[i] = min_idx
+            
+            #if the last two are each other's NN, merge them
+            if min_idx == last_visited:
+                assign_group(i,current_group_name)
+                assign_group(min_idx, current_group_name)
+                current_group_name += 1
+                last_visited = -1
+                i = find_unassigned()
+                if i == -1:
+                    not_done = False
+            else:
+                last_visited = i
+                i = min_idx
+                
+        
+        current_block_size *= 2;
+        if current_block_size >= target_block_size:
+            return new_group
+        else:
+            return self.hierchical_blocking(target_block_size, similarity, current_block_size, new_group)
+
+    def hierchical_blocking_nofix(self, similarity, tau = 0.8):
+        
+        class Group():
+             def __init__(self, graph, row_idx):
+                 self.rows = [row_idx,]
+                 self.ID = row_idx
+                 self.graph = graph
+                 self.pattern = graph.pos[row_idx]
+                 self.closest = -1
+                 self.closest_val = float('inf')
+             def add(self,group):
+
+                 self.rows = group.rows + self.rows
+                 self.pattern = np.union1d(self.pattern, group.pattern)
+
+
+             def __eq__(self, other):
+                 if isinstance(other, Group):
+                     return self.ID == other.ID
+                 return False
+             def update_closest(self, sender):
+                 new_val = self.distance(sender)
+                 if new_val < self.closest_val:
+                     self.closest = sender
+                     self.closest_val = new_val
+                     return True
+                 return False
+             
+             def distance(self, other):
+
+                 p1 = self.pattern
+                 p2 = other.pattern
+                 if len(p1) == 0 and len(p2) == 0:
+                     return 0
+                 s1 = len(self.rows)
+                 s2 = len(other.rows)
+#                 if s1 > 10 or s2 > 10:
+#                     return 1;
+                 d = similarity(p1,s1,p2,s2)
+                 return d
+                 
+             def find_closest(self, group_list):
+                 min_sim = float('inf')
+                 best_group = None
+                 for g in group_list:
+                     if g.ID != self.ID:
+                         tmp_sim = self.distance(g)
+                         if tmp_sim < min_sim:
+                             min_sim = tmp_sim
+                             best_group = g
+                 self.closest = best_group
+                 self.closest_val = min_sim
+                 if best_group == None:
+                     print(f"DEBUG: grouplist size {len(group_list)}, group {self.ID} with pattern {self.pattern}, closest val {min_sim}")
+                 
+        groups = [Group(self, row) for row in range(self.N)]
+        for g in groups:
+            g.find_closest(groups)
+        
+        
+        min_val = -1
+        while(len(groups) > 2):
+            #find closest elements
+            min_val = float('inf')
+            min_idx = -1
+            for idx, g in enumerate(groups):
+                if g.closest_val < min_val:
+                    min_val = g.closest_val
+                    min_idx = idx
+                    print(tau,min_val)
+            if min_val > tau:
+                break;
+            little = groups.pop(min_idx)
+            big = little.closest
+            big.add(little)
+            for g in groups:
+                if g.ID == big.ID:
+                    g.find_closest(groups)
+                    continue
+                if g.closest.ID == big.ID or g.closest.ID == little.ID:
+                    #if the new group is not the closest, run the closest search
+                    if not g.update_closest(big):
+                        g.find_closest(groups)
+                else: 
+                    g.update_closest(big)
+                    
+            
+        grouping = np.ones(self.N)
+        current = 0
+        for g in groups:
+            for row in g.rows:
+                grouping[row] = current
+            current += 1
+        return grouping
+        
+    
+    def hierchical_blocking(self, target_block_size, similarity, current_block_size = 1, grouping = None):
+        
+        if current_block_size == 1:
+            grouping = range(self.N)
+        
+        new_group = np.ones(self.N)*(-1)
+        induced_row_order = sorted(range(len(grouping)), key=lambda k: grouping[k])
+        
+        #print(f"fixed size blocking, current size {current_block_size}, target {target_block_size}") 
+        #print(f"CURRENT GROUPING: {grouping}")
+    
+    
+        def is_not_assigned(i):
+            old_idx = induced_row_order[i]
+            #print(f"checking {i}, old idx {old_idx}")
+            return new_group[old_idx] == -1
+        
+        def assign_group(i, group_name):
+            #print(f"assigning {i} to {group_name}")
+            for idx in range(i, i + current_block_size):
+                old_idx = induced_row_order[idx]
+                new_group[old_idx] = group_name
+                #print(f"***** {idx}, old_idx {old_idx}")
+                
+        def get_pattern(idx):
+            #print(f"pattern:, {idx}, {len(induced_row_order)}")
+
+            #print(f"getting pattern for row {idx}")
+            pattern = self.pos[induced_row_order[idx]]
+            for idx in range(idx, idx+current_block_size):
+                row = self.pos[induced_row_order[idx]]
+                pattern = np.union1d(pattern,row);
+            return pattern
+
+        
+        current_group_name = 0
+        for i in range(self.N//current_block_size):
+            group_idx = i*current_block_size
+            #print(f"EVALUATING row {i}")
+            if is_not_assigned(group_idx):
+                pattern = get_pattern(group_idx)
+                
+                #find group with max similarity
+                min_sim = float('inf')
+                min_idx = -1
+                for j in range((i+1), self.N//current_block_size):
+                    other_group_idx = j*current_block_size
+
+                    if is_not_assigned(other_group_idx):
+                        other_pattern = get_pattern(other_group_idx)
+                        tmp_sim = similarity(pattern, other_pattern)
+                        if tmp_sim < min_sim:
+                            min_sim = tmp_sim
+                            min_idx = other_group_idx
+                
+                #merge group with max similarity
+                
+                assign_group(group_idx,current_group_name)
+                assign_group(min_idx, current_group_name)
+                #print(f"merged block {i}, true {induced_row_order[group_idx]}, with block {max_idx}, true {induced_row_order[max_idx]}")
+                #print(new_group)
+                current_group_name += 1
+        
+        current_block_size *= 2;
+        if current_block_size >= target_block_size:
+            return new_group
+        else:
+            return self.hierchical_blocking(target_block_size, similarity, current_block_size, new_group)
+
+                        
+        
     def fixed_size_blocking(self, block_size, merge_crit):
         group_name = -1;
         group_array = np.ones(self.N)*(-1)
@@ -187,7 +454,7 @@ class CSR:
 
     
     
-    def blocking_show(self,grouping, sim = None, filename = "blocking_structure_example.txt"):
+    def blocking_show(self,grouping, filename = "blocking_structure_example.txt"):
         induced_row_order = sorted(range(len(grouping)), key=lambda k: grouping[k])
         
         current_group = 0;
@@ -286,12 +553,14 @@ def merge_patterns(p1,p2):
     return np.union1d(p1, p2)
 
 
-def weighted_sim(size1,p1,p2, tau, use_size = False, relative_val = True, cosine = False):
+def weighted_sim(size1, p1, p2, tau, use_size = False, relative_val = True, cosine = False):
+    unsim = general_sim(size1, p1, p2, use_size, relative_val, cosine);
+    return unsim <= tau 
+    
+def general_sim(size1,p1,p2, use_size = False, relative_val = True, cosine = False):
     if (len(p1) == 0) and (len(p2) == 0):
-        return True
-
-    if (len(p1) == 0) or (len(p2) == 0):
-        return False
+        return 0
+    
     i = 0
     j = 0 
     unsim = 0;
@@ -328,7 +597,7 @@ def weighted_sim(size1,p1,p2, tau, use_size = False, relative_val = True, cosine
         unsim = unsim*1./tot
     if cosine:
         unsim = unsim*1./(len(p1)*len(p2))
-    return (unsim <= tau)
+    return unsim
 
 def merge_prob(M, density,  candidates, pattern, target_size, row, safety_mult = 2):
     if len(pattern) == 0 and len(row) == 0:
@@ -389,6 +658,58 @@ def plot_comparison(n,m,density, folder = "similarity_curves"):
     plt.show()
     
     
+    
+
+
+def Hamming(v1,v2):
+    return len(np.setdiff1d(v1,v2)) + len(np.setdiff1d(v2,v1))
+
+
+def Jaccard(v1,v2):
+    return Hamming(v1,v2)/len(np.union1d(v1,v2))
+
+def Special(v1,v2):
+    if len(v1) == 0 and len(v2) == 0:
+        return 0
+    if len(v1) == 0 or len(v2) == 0:
+        return 1
+    num = Hamming(v1,v2)
+    #den = len(v1) + len(v2) - num
+    den = len(v1) + len(v2)
+    if den == 0:
+        return 1
+    return num/den
+
+def gHamming(v1, n1, v2, n2, mode = 0):
+    if mode == 0:
+        a = n2
+        b = n1
+    elif mode == 1:
+        a = n1
+        b = n2
+        
+    return a*len(np.setdiff1d(v1,v2)) + b*len(np.setdiff1d(v2,v1))
+
+
+def gJaccard(v1, n1, v2, n2, mode = 0):
+    if len(v1) == 0 and len(v2) == 0:
+        return 0
+    if len(v1) == 0 or len(v2) == 0:
+        return 1
+    num = gHamming(v1,n1,v2,n2, mode)
+    den = n1*len(v1) + n2*len(v2) + gHamming(v1,n1,v2,n2)
+    return num/den
+
+def gSpecial(v1, n1, v2, n2, mode = 0):
+    if len(v1) == 0 and len(v2) == 0:
+        return 0
+    if len(v1) == 0 or len(v2) == 0:
+        return 1
+    num = gHamming(v1,n1,v2,n2, 1)
+    den = n1*len(v1) + n2*len(v2) # + gHamming(v1,n1,v2,n2,1)
+    return num/den
+    
+    
 jaccard = lambda x,y,z,tau : weighted_sim(x,y,z,tau,use_size = False, relative_val = True)
 jaccard_special = lambda x,y,z,tau : weighted_sim(x,y,z,tau,use_size = True, relative_val = True)
 
@@ -399,12 +720,13 @@ cosine = lambda x,y,z,tau : weighted_sim(x,y,z,tau,use_size = False, relative_va
 cosine_special = lambda x,y,z,tau : weighted_sim(x,y,z,tau,use_size = True, relative_val = False, cosine = True)
 
 similarities = {
-    "jaccard" : jaccard,
-    "jaccard_special" : jaccard_special,
+    "jaccard" : lambda v1,n1,v2,n2: gJaccard(v1,1,v2,1),
+    "jaccard_special" : gJaccard,
     "hamming": hamming,
     "hamming_special": hamming_special,
     "cosine" : cosine,
-    "cosine_special": cosine_special
+    "cosine_special": cosine_special,
+    "special": lambda v1,n1,v2,n2: gSpecial(v1,n1,v2,1)
     }
 
 fixed_size_criteria = {
