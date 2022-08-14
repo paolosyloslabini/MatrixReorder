@@ -13,6 +13,7 @@ import matplotlib.pyplot as plt
 import itertools
 import similarities
 from scipy.stats import binom
+from numpy.random import default_rng
 
 class CSR: 
     def __init__(self):
@@ -79,11 +80,29 @@ class CSR:
             
 #****************************************************************
 
+
+def cs_to_dense(row, width):
+    out = np.zeros(width)
+    for elem in row:
+        out[elem] = 1
+    return out
+            
+
+def print_blocked(cmat, grouping, block_size):
+    groups = np.unique(grouping)
+    for g in groups:
+        for row, row_group in zip(cmat.pos, grouping):
+            if row_group == g:
+                print(cs_to_dense(row,cmat.M))
+        print("___"*cmat.M)
+                
+
 def make_random_CSR(n,m, density):
     graph = CSR();
     k = int(density*n*m)
     
-    nz_pos = np.random.choice(n*m, k)
+    rng = default_rng()
+    nz_pos = rng.choice(m*n, size=k, replace=False)
     mat = np.zeros(n*m);
     mat[nz_pos] = 1
     mat = mat.reshape((n,m))

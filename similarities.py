@@ -98,8 +98,11 @@ def JaccardGeneral(p1,p2,block_size = 1, s1 = 1,s2 = 1, count_zeros = True):
     if (len(p1) == 0 and len(p2) == 0): return 0;
         
     h = HammingGeneral(p1,p2,block_size, s1,s2, count_zeros)
-    return h/(len(p1)*s1 + len(p2)*s2 + h)
+    return 2*h/(len(p1)*s1 + len(p2)*s2 + h)
+
 
 
 Jaccard = lambda p1,p2,block_size : JaccardGeneral(p1,p2,block_size)
 Hamming = lambda p1,p2,block_size : HammingGeneral(p1,p2,block_size)
+
+

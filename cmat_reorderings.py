@@ -6,7 +6,9 @@ Created on Thu Aug  4 13:26:44 2022
 """
 import numpy as np
 import csr
-from similarities import merge_patterns
+from similarities import *
+    
+    
 
 def IterativeClusteringSimple(cmat, tau, dist_func):
     
@@ -20,7 +22,7 @@ def IterativeClusteringSimple(cmat, tau, dist_func):
             
             for other_row_idx in range(row_idx+1,cmat.N):
                 if group_array[other_row_idx] == -1:
-                    if dist_func(cmat.pos[row_idx], cmat.pos[other_row_idx]) < tau:
+                    if dist_func(cmat.pos[row_idx], cmat.pos[other_row_idx],1,1) <= tau:
                         group_size += 1;
                         group_array[other_row_idx] = group_name;
 
@@ -41,7 +43,7 @@ def IterativeClusteringPattern(cmat, tau, dist_func):
             for j in range(i+1,cmat.N):
                 if group_array[j] == -1:
                     other_pattern =  cmat.pos[j]
-                    if dist_func(pattern, other_pattern, group_size) < tau:
+                    if dist_func(pattern, other_pattern, group_size,1) <= tau:
                         group_size += 1;
                         group_array[j] = group_name;
                         pattern = merge_patterns(pattern, other_pattern)
@@ -72,7 +74,7 @@ def HierarchicalClustering(cmat, tau, dist_func):
          
          def update_closest(self, sender):
              new_val = self.distance(sender)
-             if new_val < self.closest_val:
+             if new_val <= self.closest_val:
                  self.closest = sender
                  self.closest_val = new_val
                  return True
@@ -86,22 +88,20 @@ def HierarchicalClustering(cmat, tau, dist_func):
                  return 0
              s1 = len(self.rows)
              s2 = len(other.rows)
-#                 if s1 > 10 or s2 > 10:
-#                     return 1;
-             d = dist_func(p1,s1,p2,s2)
+             d = dist_func(p1,p2,s1,s2)
              return d
              
          def find_closest(self, group_list):
-             min_sim = float('inf')
+             min_dist = float('inf')
              best_group = None
              for g in group_list:
                  if g.ID != self.ID:
-                     tmp_sim = self.distance(g)
-                     if tmp_sim < min_sim:
-                         min_sim = tmp_sim
+                     tmp_dist = self.distance(g)
+                     if tmp_dist <= min_dist:
+                         min_dist = tmp_dist
                          best_group = g
              self.closest = best_group
-             self.closest_val = min_sim
+             self.closest_val = min_dist
              if best_group == None:
                  print(f"DEBUG: grouplist size {len(group_list)}, group {self.ID} with pattern {self.pattern}, closest val {min_sim}")
    
@@ -144,3 +144,10 @@ def HierarchicalClustering(cmat, tau, dist_func):
             grouping[row] = current
         current += 1
     return grouping
+
+
+blockings = {
+    "IterativeClusteringSimple": IterativeClusteringSimple,
+    "IterativeClusteringPattern" : IterativeClusteringPattern,
+    "HierarchicalClustering": HierarchicalClustering
+    }
